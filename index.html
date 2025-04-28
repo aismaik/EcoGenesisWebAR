@@ -1,37 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
+  <title>AR Model Experience</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Sheikh Zayed - AR Experience</title>
 
   <!-- A-Frame & AR.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.min.js"></script>
-  <!-- Add FBX loader component -->
-  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.loaders.min.js"></script>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      font-family: 'Poppins', sans-serif;
-      background: black;
+    body, html { 
+      margin: 0; 
+      padding: 0;
+      overflow: hidden; 
+      width: 100%;
+      height: 100%;
     }
-    .loading-screen {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.9);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      z-index: 10;
-    }
-    .loading-screen.hidden {
-      display: none;
+    a-scene {
+      width: 100%;
+      height: 100%;
+      position: absolute;
     }
     .message-panel {
       position: fixed;
@@ -46,6 +35,7 @@
       width: 90%;
       text-align: center;
       z-index: 5;
+      font-family: Arial, sans-serif;
     }
     .btn-restart {
       margin-top: 10px;
@@ -60,57 +50,32 @@
     .btn-restart:hover {
       background: #45a049;
     }
-    #permission-help {
-      margin-top: 20px;
-      padding: 10px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 5px;
-      display: none;
-    }
   </style>
 </head>
-
 <body>
-  <!-- Loading screen -->
-  <div class="loading-screen" id="loading-screen">
-    <h2>Loading AR Experience...</h2>
-    <p id="permission-message" style="display: none; color: #ff9800;">Please allow camera access.</p>
-    <div id="permission-help">
-      <p>If blocked:</p>
-      <ol>
-        <li>Check the address bar for a camera icon.</li>
-        <li>Refresh the page and allow access.</li>
-        <li>Close other apps that may use the camera.</li>
-        <li>Try using Chrome or Firefox browser.</li>
-      </ol>
-    </div>
-  </div>
-
   <!-- AR Scene -->
   <a-scene
-    vr-mode-ui="enabled: false"
     embedded
-    renderer="precision: high; antialias: true;"
-    arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
-    id="scene"
+    vr-mode-ui="enabled: false"
+    renderer="logarithmicDepthBuffer: true; antialias: true;"
+    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false; detectionMode: mono_and_matrix;"
   >
     <a-assets>
-      <!-- Using GLB model as it's more widely supported -->
-      <a-asset-item id="sheikhModel" src="https://raw.githubusercontent.com/aismaik/EcoGenesisWebAR/main/sheikh-model.glb"></a-asset-item>
+      <!-- 3D Model -->
+      <a-asset-item id="model" src="https://raw.githubusercontent.com/aismaik/EcoGenesisWebAR/main/sheikhModel.glb"></a-asset-item>
     </a-assets>
 
-    <!-- Using GLB model instead of FBX for better compatibility -->
     <a-entity 
-      gltf-model="#sheikhModel"
-      scale="0.5 0.5 0.5"
-      position="0 0 -2"
+      gltf-model="#model"
+      position="0 0 -1.5" <!-- Centered Position -->
+      scale="0.3 0.3 0.3" <!-- Scaled Down -->
       rotation="0 0 0"
-      animation="property: rotation; to: 0 360 0; loop: true; dur: 10000">
-    </a-entity>
+      animation="property: rotation; to: 0 360 0; loop: true; dur: 10000"
+    ></a-entity>
 
     <a-text
       value="Congratulations! You've saved the environment!"
-      position="0 1.5 -2"
+      position="0 1.5 -1.5"
       align="center"
       color="white"
       width="3">
@@ -126,94 +91,58 @@
     <button class="btn-restart" onclick="restartExperience()">Restart</button>
   </div>
 
-  <!-- Single audio element with correct path -->
-  <audio id="zayedAudio" src="https://raw.githubusercontent.com/aismaik/EcoGenesisWebAR/main/sheikhMessage.mp3"></audio>
+  <!-- Audio -->
+  <audio id="zayedAudio" src="https://raw.githubusercontent.com/aismaik/EcoGenesisWebAR/main/sheikhMessage.mp3" autoplay loop></audio>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const loadingScreen = document.getElementById('loading-screen');
-      const permissionMessage = document.getElementById('permission-message');
-      const permissionHelp = document.getElementById('permission-help');
+      // Add error handling for the scene
+      const scene = document.querySelector('a-scene');
       const audio = document.getElementById('zayedAudio');
 
-      // Check if the page is loaded securely (HTTPS)
-      function isSecureContext() {
-        return window.isSecureContext || location.protocol === 'https:';
-      }
+      scene.addEventListener('loaded', () => {
+        console.log('Scene loaded successfully');
+        playAudio();
+      });
 
-      async function initAR() {
+      scene.addEventListener('error', (e) => {
+        console.error('Scene error:', e.detail);
+        alert('Error loading AR experience. Please check console for details.');
+      });
+
+      // Add camera permission handling
+      async function checkCamera() {
         try {
-          // Check for secure context
-          if (!isSecureContext()) {
-            throw new Error("Page must be loaded over HTTPS for camera access");
-          }
-
-          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error("Camera API not supported in this browser");
-          }
-
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
-              facingMode: 'environment',
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          });
-
-          setTimeout(() => {
-            loadingScreen.classList.add('hidden');
-            playAudio();
-          }, 1500);
-
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           stream.getTracks().forEach(track => track.stop());
-
         } catch (error) {
-          console.error('AR initialization error:', error);
-          permissionMessage.style.display = 'block';
-          permissionHelp.style.display = 'block';
-
-          if (error.name === 'NotAllowedError') {
-            permissionMessage.textContent = "Camera access denied. Please allow camera permissions.";
-          } else if (error.name === 'NotFoundError') {
-            permissionMessage.textContent = "No camera found. Please check your device.";
-          } else if (error.message.includes('HTTPS')) {
-            permissionMessage.textContent = "This experience requires HTTPS for camera access.";
-          } else {
-            permissionMessage.textContent = "Error initializing AR: " + error.message;
-          }
+          console.error('Camera error:', error);
+          alert('Camera access is required for this AR experience. Please allow camera permissions.');
         }
       }
 
+      // Audio playback
       function playAudio() {
-        try {
-          audio.volume = 0.5;
-          const playPromise = audio.play();
-          
-          if (playPromise !== undefined) {
-            playPromise.catch(error => {
-              console.log('Audio play was prevented:', error);
-              // Show a play button or instructions if audio is blocked
-            });
-          }
-        } catch (error) {
-          console.error('Audio error:', error);
+        audio.volume = 0.7;
+        const playPromise = audio.play();
+
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.log('Audio play blocked by browser.', error);
+          });
         }
       }
 
+      // Restart experience
       function restartExperience() {
         window.location.reload();
       }
 
-      // Make restart function available globally
+      // Expose restart function globally
       window.restartExperience = restartExperience;
 
-      // Initialize AR experience
-      initAR();
-
-      // Allow clicking loading screen to retry
-      loadingScreen.addEventListener('click', () => {
-        initAR();
-      });
+      // Check camera on start
+      checkCamera();
     });
   </script>
 </body>
